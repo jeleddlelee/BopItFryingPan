@@ -29,7 +29,15 @@
 
  int prevNum = -1;
 
+ int longPressTime = 3000;
+ int currentState = 0;
+ int lastState = LOW;
+ unsigned long pressedTime = 0;
+ unsigned long releasedTime = 0;
+
  int zval;
+
+ 
 
  TM1637Display display(CLK, DIO);
 
@@ -54,7 +62,7 @@ void setup() {
   Serial.begin (9600); 
   //Analog
   pinMode(A0, INPUT); //stirIt
-  pinMode(A1, INPUT); //setIt
+  pinMode(A1, INPUT); //setItU
   pinMode(A2, INPUT); // flipIt
 
   pinMode(CLKStir, INPUT);
@@ -79,20 +87,46 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  delay(5000);
   startGame(); 
 }
 
 void startGame() {
   digitalWrite(ledYLW, HIGH);
-  
+  currentState = digitalRead(startBtn);
   //When the start button is flipped, start the game.
+
   if(digitalRead(startBtn) == HIGH)
   {
     digitalWrite(ledYLW, LOW);
     digitalWrite(ledRED, HIGH);
-    delay(1000);
+    delay(300);
     logic();
   }
+
+  /*if(lastState == HIGH && currentState == LOW){
+    display.showNumberDec(1);
+    delay(500);
+    pressedTime = millis();}
+  else if(lastState == LOW && currentState == HIGH){
+    releasedTime == millis();
+
+    long pressDuration = releasedTime - pressedTime;
+
+    display.showNumberDec(2);
+    delay(500);
+
+    if( pressDuration > longPressTime ){
+      digitalWrite(ledYLW, LOW);
+      display.showNumberDec(3);
+      delay(1000);
+      logic();
+    }
+    
+   }
+
+   lastState = currentState;*/
+    
 }
 
 void audio(int choice){
@@ -103,32 +137,40 @@ void audio(int choice){
    switch(choice){
     case '1':
       for(int i = 0; i < 4; i++){
-        tone(1, 350, 500);
-        delay(100); 
+        tone(1, 350);
+        delay(200); 
       }
       break;
      
      case '2':
       for(int i = 0; i < 2; i++){
-        tone(1, 500, 250);
-        tone(1, 450, 250);
-        tone(1, 400, 250);
-        tone(1, 450, 250);
+        tone(1, 500);
+        delay(250);
+        tone(1, 450);
+        delay(250);
+        tone(1, 400);
+        delay(250);
+        tone(1, 450);
+        delay(250);
       }
       break;
      
      case'3':
       for(int i = 0; i < 3; i++){
-        tone(1, 500, 250);
-      tone(1, 500, 600);
+        tone(1, 500);
+        delay(200);
+      tone(1, 500);
+      delay(500);
       }
       break;
      case'4'://Win
-      tone(1, 600, 200);
+      tone(1, 600);
+      delay(500);
       break;
      
      case'5'://Fail
-      tone(1, 250, 2000);
+      tone(1, 250);
+      delay(3000);
       break;
    }
    
@@ -171,7 +213,7 @@ void logic() {
     }
       
     prevNum = setNumber;
-    display.showNumberDec(375);
+    display.showNumberDec(375);//DEBUG
     timeLimit = millis() + 1000;// * (pow(1.1, 11.525 - (x / 5)) + 2);
     
     while((millis() < timeLimit)){// || (stirIt.curMode == -1) || (setIt.curMode == -1) || (fryIt.curMode == HIGH)){ 
