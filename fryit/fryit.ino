@@ -59,7 +59,7 @@
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin (9600); 
+  // Serial.begin (9600); 
   //Analog
   pinMode(A0, INPUT); //stirIt
   pinMode(A1, INPUT); //setItU
@@ -87,7 +87,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  delay(5000);
+  //delay(5000);
   startGame(); 
 }
 
@@ -99,82 +99,12 @@ void startGame() {
   if(digitalRead(startBtn) == HIGH)
   {
     digitalWrite(ledYLW, LOW);
-    digitalWrite(ledRED, HIGH);
+    //digitalWrite(ledRED, HIGH);
     delay(300);
     logic();
-  }
-
-  /*if(lastState == HIGH && currentState == LOW){
-    display.showNumberDec(1);
-    delay(500);
-    pressedTime = millis();}
-  else if(lastState == LOW && currentState == HIGH){
-    releasedTime == millis();
-
-    long pressDuration = releasedTime - pressedTime;
-
-    display.showNumberDec(2);
-    delay(500);
-
-    if( pressDuration > longPressTime ){
-      digitalWrite(ledYLW, LOW);
-      display.showNumberDec(3);
-      delay(1000);
-      logic();
-    }
-    
-   }
-
-   lastState = currentState;*/
-    
+  }    
 }
 
-void audio(int choice){
-  /*
-   * accepts integer arguement
-   * integer corresponds to 5 sounds made
-   */
-   switch(choice){
-    case '1':
-      for(int i = 0; i < 4; i++){
-        tone(1, 350);
-        delay(200); 
-      }
-      break;
-     
-     case '2':
-      for(int i = 0; i < 2; i++){
-        tone(1, 500);
-        delay(250);
-        tone(1, 450);
-        delay(250);
-        tone(1, 400);
-        delay(250);
-        tone(1, 450);
-        delay(250);
-      }
-      break;
-     
-     case'3':
-      for(int i = 0; i < 3; i++){
-        tone(1, 500);
-        delay(200);
-      tone(1, 500);
-      delay(500);
-      }
-      break;
-     case'4'://Win
-      tone(1, 600);
-      delay(500);
-      break;
-     
-     case'5'://Fail
-      tone(1, 250);
-      delay(3000);
-      break;
-   }
-   
-}
 
 struct UserChoice {
   int comMode;
@@ -193,13 +123,14 @@ void logic() {
 
    for(int x = 0; x < 99; x++){
     
+    
     stirIt.curMode = 0;
     setIt.curMode = 0;
     fryIt.curMode = LOW;
-    randNum = random(1,4);
+    randNum = 1;//random(1,4);
+    delay(500);
     
     digitalWrite(ledGRN, LOW); 
-    audio(randNum);
 
     setNumber = random(0,10);
 
@@ -211,30 +142,89 @@ void logic() {
         setNumber++;
       else setNumber++;
     }
+    
+    if(randNum == 1){
+      
+      display.showNumberDec(1);
+      
+      for(int i = 0; i < 4; i++){
+        tone(1, 350);
+        delay(200);
+        noTone(1);
+        delay(10); 
+      }
+    }
+    else if(randNum == 2){
+     display.showNumberDec(2);
+      
+     for(int i = 0; i < 2; i++){
+        tone(1, 500);
+        delay(250);
+        noTone(1);
+        delay(10);
+        tone(1, 450);
+        delay(250);
+        noTone(1);
+        delay(10);
+        tone(1, 400);
+        delay(250);
+        noTone(1);
+        delay(10);
+        tone(1, 450);
+        delay(250);
+        noTone(1);
+        delay(10);
+      } 
+      display.showNumberDec(randNum);
+      
+    }
+    else {
+      
+      display.showNumberDec(3);
+      for(int i = 0; i < 3; i++){
+        tone(1, 500);
+        delay(200);
+        noTone(1);
+        delay(10);
+      tone(1, 500);
+      delay(500);
+      noTone(1);
+        delay(10);
+      }
+    }
+    
       
     prevNum = setNumber;
-    display.showNumberDec(375);//DEBUG
-    timeLimit = millis() + 1000;// * (pow(1.1, 11.525 - (x / 5)) + 2);
+    timeLimit = millis() + 3000;// * (pow(1.1, 11.525 - (x / 5)) + 2);
     
     while((millis() < timeLimit)){// || (stirIt.curMode == -1) || (setIt.curMode == -1) || (fryIt.curMode == HIGH)){ 
-      stirIt.curMode = isStir(stirIt.curMode);
+      stirIt.curMode = isStir(stirCurrent);
       setIt.curMode = isSet(setNumber, setCurrent);
       fryIt.curMode = isFry();
     }
-    display.showNumberDec(66);
+    
     stirIt.isCorrect = ((stirIt.comMode == randNum) && (stirIt.curMode == -1)) || ((stirIt.comMode != randNum) && (stirIt.curMode != -1));
     setIt.isCorrect = ((setIt.comMode == randNum) && (setIt.curMode == -1)) || ((setIt.comMode != randNum) && (setIt.curMode != -1));
-    fryIt.isCorrect = ((fryIt.comMode == randNum) && (fryIt.curMode == HIGH)) || ((fryIt.comMode != randNum) && (fryIt.curMode == LOW));
+    //fryIt.isCorrect = ((fryIt.comMode == randNum) && (fryIt.curMode == HIGH)) || ((fryIt.comMode != randNum) && (fryIt.curMode == LOW));
 
-    if(stirIt.isCorrect && setIt.isCorrect && fryIt.isCorrect){
+    if(stirIt.isCorrect){// && setIt.isCorrect && fryIt.isCorrect){
       count++;
-      audio(4);
+      
+      tone(1, 600);
+      delay(500);
+      noTone(1);
+      delay(10);
+     
       digitalWrite(ledGRN, HIGH);
       display.setSegments(good); 
       delay(500); 
     }
     else{
-      audio(5);
+      tone(1, 250);
+      delay(3000);
+      noTone(1);
+      delay(10);
+      
       digitalWrite(ledRED, HIGH);
       display.setSegments(fail);
       delay(500);
@@ -252,7 +242,6 @@ void logic() {
 }
 
 int isStir(int stirTemp) {
-  display.showNumberDec(1);
   curClkStir = digitalRead(CLKStir);
   if(curClkStir != prevClkStir){
     if(digitalRead(A0)!= curClkStir)
@@ -260,14 +249,16 @@ int isStir(int stirTemp) {
     else
       stirTemp++;
   }
-  
-  if(stirTemp > 6)
+  display.showNumberDec(stirTemp);
+  if(stirTemp > 2)
     return -1;
-  else return stirTemp;
+  else{ 
+  stirCurrent = stirTemp;
+  return 500;
+  }
 }
 
 int isSet(int setNumber, int setTemp) {
-  display.showNumberDec(2);
   curClkStir = digitalRead(CLKStir);
   
   if(curClkStir != prevClkStir){
@@ -293,7 +284,6 @@ int isSet(int setNumber, int setTemp) {
 }
 
 int isFry() {
-  display.showNumberDec(3);
   zval = analogRead(A2);
   int z = map(zval, 301, 443, -100, 100);
   float zg = (float)z/(-100.00);
