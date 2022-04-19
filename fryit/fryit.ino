@@ -1,5 +1,9 @@
 #include <Arduino.h>
 #include <TM1637Display.h>
+#include <Wire.h>
+#include <MPU6050.h>
+
+MPU6050 mpu;
 
  int audioVar = 1;
  int CLK = 2;
@@ -8,9 +12,12 @@
  int ledGRN = 5;
  int ledYLW = 6;
  int startBtn = 7;
+ //int outputA = 8;
+ int outputB = 9;
 
  int CLKStir = 8;
- int CLKSet = 9;
+ int dataSet = A2;
+ int CLKSet = A3;
 
  int prevClkStir = 0;
  int prevClkSet = 0;
@@ -27,17 +34,23 @@
  int stirCurrent = 0;
  int setCurrent = 0;
 
+ int counter = 0; 
+ int aState;
+ int aLastState;
+ int aSetState = 0;
+ int aSetLast = 0;
+ int setCount = 0;
  int prevNum = -1;
 
- int longPressTime = 3000;
  int currentState = 0;
  int lastState = LOW;
  unsigned long pressedTime = 0;
  unsigned long releasedTime = 0;
+ int frySum = 0;
+
+ int prevDisplay = 0;
 
  int zval;
-
- 
 
  TM1637Display display(CLK, DIO);
 
@@ -55,15 +68,13 @@
  SEG_D | SEG_E | SEG_F,                           // L
  };
 
- uint8_t data[] = { 0x0, 0x0, 0x0, 0x0};
-
 void setup() {
   // put your setup code here, to run once:
   // Serial.begin (9600); 
   //Analog
-  pinMode(A0, INPUT); //stirIt
-  pinMode(A1, INPUT); //setItU
-  pinMode(A2, INPUT); // flipIt
+    pinMode(A0, INPUT); //stirIt
+ // pinMode(A1, INPUT); //setItU
+ // pinMode(A2, INPUT); // flipIt
 
   pinMode(CLKStir, INPUT);
   pinMode(CLKSet, INPUT);
@@ -79,15 +90,28 @@ void setup() {
   pinMode(ledGRN, OUTPUT); //Green Leds
   pinMode(ledYLW, OUTPUT); //Yellow Leds
   pinMode(startBtn, INPUT); //Start button
+  pinMode(dataSet, INPUT);
+  pinMode(CLKSet, INPUT);
+//  pinMode (outputA,INPUT);
+  pinMode (outputB,INPUT);
 
+  aLastState = digitalRead(8);
+  aSetLast = digitalRead(A3);
+  
   randomSeed(42);
 
   display.setBrightness(0x0f);
+
+  while(!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G))
+  {
+    //Serial.println("Could not find a valid MPU6050 sensor, check wiring!");
+    delay(10);
+  }
+
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  //delay(5000);
   startGame(); 
 }
 
@@ -122,16 +146,22 @@ void logic() {
    fryIt.comMode = 3;
 
    for(int x = 0; x < 99; x++){
-    
-    
+    stirCurrent = 0;
     stirIt.curMode = 0;
     setIt.curMode = 0;
-    fryIt.curMode = LOW;
-    randNum = 1;//random(1,4);
+    fryIt.curMode = 0;
+    setCurrent = 0;
+    prevClkSet = 0;
+    prevClkStir = 0;
+    counter = 0;
+    prevDisplay = 0;
+    frySum = 0;
+    
+    randNum = random(1,4);
     delay(500);
     
-    digitalWrite(ledGRN, LOW); 
-
+    digitalWrite(ledGRN, LOW);
+    digitalWrite(ledRED, LOW);
     setNumber = random(0,10);
 
     if(prevNum == setNumber)
@@ -145,7 +175,7 @@ void logic() {
     
     if(randNum == 1){
       
-      display.showNumberDec(1);
+      display.showNumberDec(1);////////////////////////////////////////////////////////////////
       
       for(int i = 0; i < 4; i++){
         tone(1, 350);
@@ -155,8 +185,8 @@ void logic() {
       }
     }
     else if(randNum == 2){
-     display.showNumberDec(2);
-      
+     display.showNumberDec(2);////////////////////////////////////////////////////////////////
+  
      for(int i = 0; i < 2; i++){
         tone(1, 500);
         delay(250);
@@ -175,12 +205,14 @@ void logic() {
         noTone(1);
         delay(10);
       } 
-      display.showNumberDec(randNum);
+
+      delay(50);
+      display.showNumberDec(setNumber);
       
     }
     else {
       
-      display.showNumberDec(3);
+     display.showNumberDec(3);////////////////////////////////////////////////////////////////
       for(int i = 0; i < 3; i++){
         tone(1, 500);
         delay(200);
@@ -195,9 +227,11 @@ void logic() {
     
       
     prevNum = setNumber;
-    timeLimit = millis() + 3000;// * (pow(1.1, 11.525 - (x / 5)) + 2);
+   // display.showNumberDec(setNumber);////////////////////////////////////////////////////////
+    delay(200);
+   timeLimit = millis() + 3000;// * (pow(1.1, 11.525 - (x / 5)) + 2);
     
-    while((millis() < timeLimit)){// || (stirIt.curMode == -1) || (setIt.curMode == -1) || (fryIt.curMode == HIGH)){ 
+    while((millis() < timeLimit) && ((stirIt.curMode != -1) || (setIt.curMode != -1)|| (fryIt.curMode != -1))){  
       stirIt.curMode = isStir(stirCurrent);
       setIt.curMode = isSet(setNumber, setCurrent);
       fryIt.curMode = isFry();
@@ -205,9 +239,9 @@ void logic() {
     
     stirIt.isCorrect = ((stirIt.comMode == randNum) && (stirIt.curMode == -1)) || ((stirIt.comMode != randNum) && (stirIt.curMode != -1));
     setIt.isCorrect = ((setIt.comMode == randNum) && (setIt.curMode == -1)) || ((setIt.comMode != randNum) && (setIt.curMode != -1));
-    //fryIt.isCorrect = ((fryIt.comMode == randNum) && (fryIt.curMode == HIGH)) || ((fryIt.comMode != randNum) && (fryIt.curMode == LOW));
+    fryIt.isCorrect = ((fryIt.comMode == randNum) && (fryIt.curMode == -1)) || ((fryIt.comMode != randNum) && (fryIt.curMode != -1));
 
-    if(stirIt.isCorrect){// && setIt.isCorrect && fryIt.isCorrect){
+    if(stirIt.isCorrect && setIt.isCorrect && fryIt.isCorrect){
       count++;
       
       tone(1, 600);
@@ -216,7 +250,7 @@ void logic() {
       delay(10);
      
       digitalWrite(ledGRN, HIGH);
-      display.setSegments(good); 
+      display.setSegments(good); ////////////////////////////////////////////////////////////////
       delay(500); 
     }
     else{
@@ -226,69 +260,127 @@ void logic() {
       delay(10);
       
       digitalWrite(ledRED, HIGH);
-      display.setSegments(fail);
+      display.setSegments(fail);////////////////////////////////////////////////////////////////
       delay(500);
       break;
     }
    }
-   display.showNumberDec(count);
+   display.showNumberDec(count);////////////////////////////////////////////////////////////////
    count = 0;
    digitalWrite(ledYLW, LOW);
    
    delay(1000);
    
-   display.setSegments(data);
    startGame();
 }
 
 int isStir(int stirTemp) {
-  curClkStir = digitalRead(CLKStir);
+
+ aState = digitalRead(8); // Reads the "current" state of the outputA
+   if (aState != aLastState){     
+     if (digitalRead(9) != aState) { 
+       counter ++;
+     } else {
+       counter ++;
+     }
+     display.showNumberDec(counter);
+   } 
+   //aLastState = aState; // Updates the previous state of the outputA with the current state
+  
+  /*curClkStir = digitalRead(CLKStir);
   if(curClkStir != prevClkStir){
-    if(digitalRead(A0)!= curClkStir)
+    if(digitalRead(9)!= curClkStir)
+    {
       stirTemp++;
+      display.showNumberDec(55);
+      delay(50);
+    }
     else
+    {
       stirTemp++;
+      display.showNumberDec(99);
+      delay(50);
+    }
   }
-  display.showNumberDec(stirTemp);
-  if(stirTemp > 2)
+  display.showNumberDec(stirCurrent);*/
+  if(counter > 10)
     return -1;
   else{ 
-  stirCurrent = stirTemp;
+  aLastState = aState; // Updates the previous state of the outputA with the current state
+  //stirCurrent = stirTemp;
   return 500;
   }
 }
 
 int isSet(int setNumber, int setTemp) {
-  curClkStir = digitalRead(CLKStir);
+  //display.showNumberDec(setNumber);
+  aSetState = digitalRead(A3);
+  if (aSetState != aSetLast){     
+     if (digitalRead(A2) != aSetState) { 
+       setTemp ++;
+     } else {
+       setTemp ++;
+     }
+     
+   }
+  //display.showNumberDec(setTemp);
+   //if(setTemp == 20)
+    //setTemp = 0;
   
-  if(curClkStir != prevClkStir){
-    if(digitalRead(A0)!= curClkStir)
+  /*curClkSet = digitalRead(A3);
+  //display.showNumberDec(setTemp);
+  if(curClkSet != prevClkSet){
+    if(digitalRead(A2)!= curClkSet)
     {
-      if(setTemp == 0) {
-        setTemp = 10;
-      }
-      setTemp-=0.5;
+      setTemp++;
     }  
     else
     {
-      if(setTemp == 10) {
-        setTemp = 0;
-      }
-     setTemp+=0.5;
+     setTemp++;
     }
-  }
-
-  if(setTemp == setNumber)
+    //display.showNumberDec(setTemp);
+  }*/
+  if(setTemp == 20)
+    setTemp = 0;
+  
+  //prevClkSet = curClkSet;
+  aSetLast = aSetState;
+  setCurrent = setTemp;
+  int displayNum = setTemp/2;
+ display.showNumberDec(displayNum);
+  if(displayNum == setNumber)
+  {
     return -1;
-  else return setTemp;
+  }
+  else{
+    return 500;
+  }
+  
 }
 
 int isFry() {
-  zval = analogRead(A2);
+  Vector normAccel = mpu.readNormalizeAccel();
+  frySum += abs((10 - normAccel.ZAxis));
+
+  //display.showNumberDec(frySum);
+  
+   if(frySum > 100)
+  {
+   // display.showNumberDec(normAccel.ZAxis);
+    return -1;
+  }
+  else{
+  // display.showNumberDec(normAccel.ZAxis);
+    return 0;
+  }
+  
+/*
+ zval = analogRead(A2);
   int z = map(zval, 301, 443, -100, 100);
   float zg = (float)z/(-100.00);
 
-  if(zg < 0.70 || zg > 1.10)
-    return HIGH;
-  else return LOW;
+  if(zg > -0.65)
+    return -1;
+  else return 0;
+*/
 }
